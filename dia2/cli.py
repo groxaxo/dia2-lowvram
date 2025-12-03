@@ -38,6 +38,12 @@ def main() -> None:
         default="bfloat16",
         help="Computation dtype (default: bfloat16)",
     )
+    parser.add_argument(
+        "--low-vram",
+        choices=["none", "8bit", "4bit"],
+        default="none",
+        help="Low VRAM mode using bitsandbytes quantization (default: none)",
+    )
     parser.add_argument("--topk", type=int, default=50)
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--cfg", type=float, default=1.0)
@@ -71,6 +77,7 @@ def main() -> None:
     if device is None or device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = args.dtype or "bfloat16"
+    quantization = args.low_vram if args.low_vram != "none" else None
 
     repo = args.hf
     if repo:
@@ -78,6 +85,7 @@ def main() -> None:
             repo=repo,
             device=device,
             dtype=dtype,
+            quantization=quantization,
             tokenizer_id=args.tokenizer,
             mimi_id=args.mimi,
         )
@@ -87,6 +95,7 @@ def main() -> None:
             weights_path=args.weights,
             device=device,
             dtype=dtype,
+            quantization=quantization,
             tokenizer_id=args.tokenizer,
             mimi_id=args.mimi,
         )

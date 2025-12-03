@@ -20,6 +20,10 @@ dependencies = [
   "soundfile>=0.12.1",
   "whisper-timestamped>=1.14.2",
   "gradio>=4.44.1",
+  "bitsandbytes>=0.45.0",
+  "fastapi>=0.115.0",
+  "uvicorn>=0.34.0",
+  "accelerate>=1.2.0",
 ]
 
 [project.optional-dependencies]

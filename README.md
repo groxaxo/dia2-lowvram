@@ -43,7 +43,20 @@ Try it now on Hugging Face [Spaces](https://huggingface.co/spaces/nari-labs/Dia2
      output.wav
    ```
    The first run downloads weights/tokenizer/Mimi. The CLI auto-selects CUDA when available (otherwise CPU) and defaults to bfloat16 precision—override with `--device` / `--dtype` if needed.
-4. **Conditional Generation (recommended for stable use):**
+
+4. **Low VRAM Mode (8-bit or 4-bit quantization):**
+   ```bash
+   uv run -m dia2.cli \
+     --hf nari-labs/Dia2-2B \
+     --input input.txt \
+     --low-vram 8bit \
+     --cfg 6.0 --temperature 0.8 \
+     --verbose \
+     output.wav
+   ```
+   Use `--low-vram 8bit` or `--low-vram 4bit` to reduce VRAM usage using bitsandbytes quantization. This is recommended for GPUs with limited memory.
+
+5. **Conditional Generation (recommended for stable use):**
    ```bash
    uv run -m dia2.cli \
      --hf nari-labs/Dia2-2B \
@@ -60,6 +73,55 @@ Try it now on Hugging Face [Spaces](https://huggingface.co/spaces/nari-labs/Dia2
    ```bash
    uv run gradio_app.py
    ```
+
+## OpenAI-Compatible API Server
+
+Dia2 includes an OpenAI-compatible TTS API server that works with Open WebUI and other compatible clients.
+
+### Starting the API Server
+
+```bash
+uv run -m dia2.api_server --port 4123
+```
+
+For low VRAM systems:
+```bash
+uv run -m dia2.api_server --port 4123 --low-vram 8bit
+```
+
+### API Endpoints
+
+- `POST /v1/audio/speech` - Generate speech from text (OpenAI-compatible)
+- `GET /v1/voices` - List available voices
+- `POST /v1/voices` - Add a new voice (upload audio file)
+- `DELETE /v1/voices/{name}` - Delete a voice
+- `GET /v1/models` - List available models
+
+### Setting up Open WebUI
+
+To use Dia2 TTS API with Open WebUI, follow these steps:
+
+1. Open the Admin Panel and go to **Settings → Audio**
+2. Set your TTS Settings to match the following:
+   - **Text-to-Speech Engine:** OpenAI
+   - **API Base URL:** `http://localhost:4123/v1` (or `http://host.docker.internal:4123/v1` if using Docker)
+   - **API Key:** `none`
+   - **TTS Model:** `tts-1` or `tts-1-hd`
+   - **TTS Voice:** Name of the voice you've cloned (or any default voice)
+   - **Response splitting:** Paragraphs
+
+> **Note:** The default API key is the string `none` (no API key required).
+
+### Adding Custom Voices
+
+You can add custom voices for voice cloning by placing audio files in the `voices/` directory or using the API:
+
+```bash
+# Using curl to add a voice
+curl -X POST http://localhost:4123/v1/voices \
+  -F "name=my_voice" \
+  -F "audio=@path/to/voice_sample.wav"
+```
 
 ### Programmatic Usage
 ```python
