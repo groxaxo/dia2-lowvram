@@ -167,37 +167,48 @@ def _generate_audio(text: str, voice: Optional[str] = None) -> tuple[bytes, int]
 def _audio_to_format(
     waveform: np.ndarray,
     sample_rate: int,
-    response_format: str = "mp3",
-) -> bytes:
-    """Convert waveform to the requested audio format."""
+    response_format: str = "wav",
+) -> tuple[bytes, str]:
+    """
+    Convert waveform to the requested audio format.
+
+    Returns:
+        Tuple of (audio_bytes, actual_format).
+    """
     buffer = io.BytesIO()
 
+    # Note: MP3 and AAC require additional encoders not included in soundfile
+    # We fall back to WAV for formats not directly supported
     if response_format == "mp3":
-        # Use soundfile for WAV then convert if needed
-        # For simplicity, we'll use WAV internally but return as requested format
+        # MP3 encoding would require additional libraries like pydub+ffmpeg
+        # Fall back to WAV format
         sf.write(buffer, waveform, sample_rate, format="WAV", subtype="PCM_16")
-        return buffer.getvalue()
+        return buffer.getvalue(), "wav"
     elif response_format == "opus":
-        sf.write(buffer, waveform, sample_rate, format="OGG", subtype="OPUS")
-        return buffer.getvalue()
+        try:
+            sf.write(buffer, waveform, sample_rate, format="OGG", subtype="OPUS")
+            return buffer.getvalue(), "opus"
+        except Exception:
+            # Fall back to WAV if OPUS encoding fails
+            buffer = io.BytesIO()
+            sf.write(buffer, waveform, sample_rate, format="WAV", subtype="PCM_16")
+            return buffer.getvalue(), "wav"
     elif response_format == "aac":
-        # AAC not directly supported, fall back to WAV
+        # AAC encoding requires additional libraries
+        # Fall back to WAV format
         sf.write(buffer, waveform, sample_rate, format="WAV", subtype="PCM_16")
-        return buffer.getvalue()
+        return buffer.getvalue(), "wav"
     elif response_format == "flac":
         sf.write(buffer, waveform, sample_rate, format="FLAC")
-        return buffer.getvalue()
-    elif response_format == "wav":
-        sf.write(buffer, waveform, sample_rate, format="WAV", subtype="PCM_16")
-        return buffer.getvalue()
+        return buffer.getvalue(), "flac"
     elif response_format == "pcm":
         # Raw PCM 16-bit
         pcm_data = (waveform * 32767).astype(np.int16)
-        return pcm_data.tobytes()
+        return pcm_data.tobytes(), "pcm"
     else:
         # Default to WAV
         sf.write(buffer, waveform, sample_rate, format="WAV", subtype="PCM_16")
-        return buffer.getvalue()
+        return buffer.getvalue(), "wav"
 
 
 @app.get("/")
@@ -225,12 +236,14 @@ async def create_speech(request: Request):
     Request body:
         model: str - Model to use (ignored, uses configured Dia2 model)
         input: str - Text to synthesize
-        voice: str - Voice name (optional, for voice cloning)
-        response_format: str - Audio format (mp3, opus, aac, flac, wav, pcm)
+        voice: str - Voice name (optional, for voice cloning). Default voices like
+                     'alloy', 'echo', etc. will generate without voice cloning.
+        response_format: str - Audio format (wav, flac, opus, pcm). Note: mp3/aac
+                               will fall back to wav format.
         speed: float - Speed adjustment (ignored for now)
 
     Returns:
-        Audio file in requested format.
+        Audio file in requested format (or WAV if requested format is unsupported).
     """
     try:
         body = await request.json()
@@ -241,21 +254,22 @@ async def create_speech(request: Request):
     if not text:
         raise HTTPException(status_code=400, detail="Input text is required")
 
-    voice = body.get("voice", "alloy")  # Default to "alloy" like OpenAI
-    response_format = body.get("response_format", "mp3")
+    # Voice can be None to use default generation without cloning
+    voice = body.get("voice")
+    response_format = body.get("response_format", "wav")
 
     # Validate response format
     valid_formats = ["mp3", "opus", "aac", "flac", "wav", "pcm"]
     if response_format not in valid_formats:
-        response_format = "mp3"
+        response_format = "wav"
 
     try:
         waveform, sample_rate = _generate_audio(text, voice)
-        audio_bytes = _audio_to_format(waveform, sample_rate, response_format)
+        audio_bytes, actual_format = _audio_to_format(waveform, sample_rate, response_format)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Audio generation failed: {str(e)}")
 
-    # Determine content type
+    # Determine content type based on actual format (which may differ from requested)
     content_types = {
         "mp3": "audio/mpeg",
         "opus": "audio/opus",
@@ -264,13 +278,13 @@ async def create_speech(request: Request):
         "wav": "audio/wav",
         "pcm": "audio/pcm",
     }
-    content_type = content_types.get(response_format, "audio/mpeg")
+    content_type = content_types.get(actual_format, "audio/wav")
 
     return Response(
         content=audio_bytes,
         media_type=content_type,
         headers={
-            "Content-Disposition": f'attachment; filename="speech.{response_format}"',
+            "Content-Disposition": f'attachment; filename="speech.{actual_format}"',
         },
     )
 
