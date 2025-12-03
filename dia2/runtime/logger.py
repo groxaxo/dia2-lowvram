@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import time
+from typing import Optional
+
 class RuntimeLogger:
     def __init__(self, enabled: bool) -> None:
         self.enabled = enabled

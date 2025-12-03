@@ -33,6 +33,7 @@ class Dia2:
         mimi_id: Optional[str] = None,
         device: str = "cuda",
         dtype: str = "auto",
+        quantization: Optional[str] = None,
         default_config: Optional[GenerationConfig] = None,
     ) -> None:
         bundle = resolve_assets(
@@ -47,6 +48,7 @@ class Dia2:
         self._mimi_id = mimi_id or bundle.mimi_id
         self.device = device
         self._dtype_pref = dtype or "auto"
+        self._quantization = quantization
         self.default_config = default_config or GenerationConfig()
         self._runtime: Optional[RuntimeContext] = None
 
@@ -57,10 +59,11 @@ class Dia2:
         *,
         device: str = "cuda",
         dtype: str = "auto",
+        quantization: Optional[str] = None,
         tokenizer_id: Optional[str] = None,
         mimi_id: Optional[str] = None,
     ) -> "Dia2":
-        return cls(repo=repo, device=device, dtype=dtype, tokenizer_id=tokenizer_id, mimi_id=mimi_id)
+        return cls(repo=repo, device=device, dtype=dtype, quantization=quantization, tokenizer_id=tokenizer_id, mimi_id=mimi_id)
 
     @classmethod
     def from_local(
@@ -70,6 +73,7 @@ class Dia2:
         *,
         device: str = "cuda",
         dtype: str = "auto",
+        quantization: Optional[str] = None,
         tokenizer_id: Optional[str | Path] = None,
         mimi_id: Optional[str] = None,
     ) -> "Dia2":
@@ -79,6 +83,7 @@ class Dia2:
             tokenizer_id=tokenizer_id,
             device=device,
             dtype=dtype,
+            quantization=quantization,
             mimi_id=mimi_id,
         )
 
@@ -224,6 +229,7 @@ class Dia2:
             mimi_id=self._mimi_id,
             device=self.device,
             dtype_pref=self._dtype_pref,
+            quantization=self._quantization,
         )
         self._tokenizer_id = tokenizer_ref
         self._mimi_id = mimi_ref

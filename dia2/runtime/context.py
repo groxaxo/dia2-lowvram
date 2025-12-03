@@ -75,6 +75,7 @@ def build_runtime(
     mimi_id: Optional[str],
     device: str,
     dtype_pref: str,
+    quantization: Optional[str] = None,
 ) -> tuple[RuntimeContext, str, str]:
     device_obj = torch.device(device)
     if device_obj.type == "cuda":
@@ -102,8 +103,18 @@ def build_runtime(
             torch.backends.cudnn.allow_tf32 = True
     precision = resolve_precision(dtype_pref, device_obj)
     config = load_config(config_path)
-    model = Dia2Model(config, precision, device=device_obj)
-    load_file_into_model(model, str(weights_path), device=device)
+
+    # For quantization, first load model on CPU, then quantize and move to device
+    if quantization and quantization != "none":
+        from ..core.quantization import quantize_model
+        # Create model on CPU first to avoid memory spikes
+        model = Dia2Model(config, precision, device=torch.device("cpu"))
+        load_file_into_model(model, str(weights_path), device="cpu")
+        # Quantize and move to target device
+        model = quantize_model(model, quantization, device_obj, precision.compute)
+    else:
+        model = Dia2Model(config, precision, device=device_obj)
+        load_file_into_model(model, str(weights_path), device=device)
 
     tokenizer_ref = tokenizer_id or config.assets.tokenizer or repo_id
     if tokenizer_ref is None:
