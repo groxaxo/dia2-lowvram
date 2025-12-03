@@ -291,7 +291,14 @@ async def create_speech(request: Request):
 
 @app.get("/v1/voices")
 async def list_voices():
-    """List all available voices."""
+    """
+    List all available voices.
+
+    Returns a list of custom voices added via /v1/voices and OpenAI-compatible
+    default voice names (alloy, echo, fable, onyx, nova, shimmer). Note that
+    default voices do not provide actual voice cloning - they are provided for
+    API compatibility only. Use custom voices for actual voice cloning.
+    """
     voices_list = []
     for name, info in _voices.items():
         voices_list.append({
@@ -300,7 +307,8 @@ async def list_voices():
             "aliases": info.get("aliases", []),
         })
 
-    # Add default OpenAI voice names for compatibility
+    # Add default OpenAI voice names for API compatibility
+    # Note: These don't provide actual voice cloning, just placeholder names
     default_voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
     for voice in default_voices:
         if voice not in _voices:
@@ -309,6 +317,7 @@ async def list_voices():
                 "name": voice,
                 "aliases": [],
                 "builtin": True,
+                "description": "OpenAI-compatible placeholder (no voice cloning)",
             })
 
     return {"voices": voices_list}
